@@ -1,0 +1,11 @@
+.git
+.github
+.atl
+coverage
+dist
+node_modules
+.env
+.env.*
+Dockerfile
+docker-compose.yml
+*.log
