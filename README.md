@@ -21,6 +21,27 @@ Mock HTTP server for MCP-style clients.
 | `PORT` | `3000` | HTTP listen port |
 | `MCP_NAME` | `mcp-mock` | MCP server name and health payload name |
 
+## Tenant request configuration
+
+Each MCP HTTP request can carry its own tenant API settings through headers:
+
+| Header | Example | Purpose |
+|--------|---------|---------|
+| `X-Api-Url` | `https://api.example.com/v1` | Base URL for the tenant API |
+| `Authorization` | `Bearer pat_123` | Tenant PAT / bearer token |
+
+Send both headers on each MCP request that needs tenant-aware tools. The server validates the headers per request and exposes the parsed config to tools through request context.
+
+## Mock tenant-aware tool
+
+`mock-api-ping` is a safe stand-in for a real external integration.
+
+| Behavior | What you should see |
+|----------|---------------------|
+| Valid `X-Api-Url` + `Authorization: Bearer ...` | A JSON response with the tenant API URL, `bearerTokenPresent: true`, and a simulated `GET /ping` summary. |
+| Missing or invalid tenant headers | A tool error with a clear header validation message. |
+| Secret token value | Never returned by the tool. |
+
 ## Versioning
 
 | Source | Purpose |
@@ -94,6 +115,7 @@ pnpm format
 
 - `GET /health` — JSON health response with `ok`, `name`, and `uptime`.
 - `/mcp*` — MCP streamable HTTP transport handled by the SDK bridge.
+- `mock-api-ping` — mock tenant-aware tool that verifies request-scoped tenant config without calling an external API.
 
 ## MCP Inspector
 
@@ -116,7 +138,9 @@ Use the Inspector as a client against the running HTTP server:
 - `src/config/env.ts` — environment parsing and validation
 - `src/http/routes/health.ts` — health route handler
 - `src/mcp/create-server.ts` — MCP server construction and tool registration
+- `src/mcp/request-config.ts` — request-scoped tenant config extraction and lookup helpers
 - `src/version.ts` — runtime version resolution from `package.json`
 - `src/mcp/tools/echo.ts` — echo tool registration
+- `src/mcp/tools/mock-api-ping.ts` — mock tenant-aware tool
 - `src/mcp/tools/time.ts` — time tool registration
 - `src/mcp/transport.ts` — Node HTTP to MCP transport bridge

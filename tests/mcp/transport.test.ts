@@ -3,7 +3,10 @@ import type http from 'node:http';
 import { expect, test } from 'vitest';
 
 import { createMcpServer } from '../../src/mcp/create-server.js';
-import { createMcpTransportBridge } from '../../src/mcp/transport.js';
+import {
+  createMcpTransportBridge,
+  extractMcpRequestMetadata,
+} from '../../src/mcp/transport.js';
 
 function createMockResponse() {
   let body = '';
@@ -134,4 +137,46 @@ test('accepts string body chunks while reading transport requests', async () => 
 
   expect(res.ended).toBe(true);
   expect(res.statusCode).not.toBe(0);
+});
+
+test('extracts minimal MCP metadata from JSON-RPC request bodies', () => {
+  expect(
+    extractMcpRequestMetadata(
+      Buffer.from(
+        JSON.stringify({
+          id: 1,
+          jsonrpc: '2.0',
+          method: 'initialize',
+          params: {},
+        }),
+      ),
+    ),
+  ).toEqual({
+    mcpMethod: 'initialize',
+  });
+
+  expect(
+    extractMcpRequestMetadata(
+      Buffer.from(
+        JSON.stringify({
+          id: 2,
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            arguments: {
+              message: 'hello world',
+            },
+            name: 'echo',
+          },
+        }),
+      ),
+    ),
+  ).toEqual({
+    mcpMethod: 'tools/call',
+    mcpToolName: 'echo',
+  });
+
+  expect(
+    extractMcpRequestMetadata(Buffer.from('{"jsonrpc":"2.0"')),
+  ).toBeUndefined();
 });

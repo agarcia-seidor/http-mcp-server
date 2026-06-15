@@ -1,7 +1,10 @@
 import type http from 'node:http';
 
 import type { AppEnv } from '../config/env.js';
-import type { McpTransportBridge } from '../mcp/transport.js';
+import type {
+  McpRequestMetadata,
+  McpTransportBridge,
+} from '../mcp/transport.js';
 import type { Logger } from '../observability/logger.js';
 import { handleHealthRequest } from './routes/health.js';
 
@@ -34,31 +37,45 @@ export function createRequestHandler({
     req: http.IncomingMessage,
     res: http.ServerResponse,
   ): Promise<void> {
+    let mcpRequestMeta: McpRequestMetadata | undefined;
+    const requestMeta = {
+      method: req.method ?? '<missing>',
+      url: req.url ?? '<missing>',
+    };
+    const startedAt = Date.now();
+
+    logger.info('Request started', requestMeta);
+
     try {
       if (!req.url) {
         sendTextResponse(res, 400, 'Missing URL');
-        return;
-      }
-
-      if (req.method === 'GET' && req.url === '/health') {
+      } else if (req.method === 'GET' && req.url === '/health') {
         handleHealthRequest(res, env.mcpName);
-        return;
-      }
-
-      if (req.url.startsWith('/mcp')) {
+      } else if (req.url.startsWith('/mcp')) {
         await mcpTransport.handleRequest(
           req,
           res,
           `http://localhost:${env.port}`,
+          {
+            onMetadata(metadata) {
+              mcpRequestMeta = metadata;
+            },
+          },
         );
-        return;
+      } else {
+        sendTextResponse(res, 404, 'Not found');
       }
 
-      sendTextResponse(res, 404, 'Not found');
+      logger.info('Request completed', {
+        ...requestMeta,
+        ...(mcpRequestMeta ?? {}),
+        statusCode: res.statusCode,
+        durationMs: Date.now() - startedAt,
+      });
     } catch (error) {
       logger.error('Unhandled request error', error, {
-        method: req.method,
-        url: req.url,
+        ...requestMeta,
+        ...(mcpRequestMeta ?? {}),
       });
 
       if (res.headersSent) {
