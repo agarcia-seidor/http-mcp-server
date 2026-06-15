@@ -42,7 +42,15 @@ function createMockResponse() {
   };
 }
 
-function createAppUnderTest() {
+function createMockLogger() {
+  return {
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+  };
+}
+
+function createAppUnderTest(logger = createMockLogger()) {
   const env: AppEnv = {
     mcpName: 'demo-server',
     port: 0,
@@ -52,14 +60,14 @@ function createAppUnderTest() {
     name: env.mcpName,
   });
 
-  const app = createApp({ env, mcpServer });
+  const app = createApp({ env, logger, mcpServer });
   const requestHandler = app.listeners('request')[0] as http.RequestListener;
 
-  return { app, env, requestHandler };
+  return { app, env, logger, requestHandler };
 }
 
 test('returns 400 when the request URL is missing', async () => {
-  const { requestHandler } = createAppUnderTest();
+  const { logger, requestHandler } = createAppUnderTest();
   const res = createMockResponse();
 
   await requestHandler(
@@ -69,10 +77,20 @@ test('returns 400 when the request URL is missing', async () => {
 
   expect(res.statusCode).toBe(400);
   expect(res.bodyText).toBe('Missing URL');
+  expect(logger.info).toHaveBeenCalledWith('Request started', {
+    method: 'GET',
+    url: '<missing>',
+  });
+  expect(logger.info).toHaveBeenCalledWith('Request completed', {
+    method: 'GET',
+    url: '<missing>',
+    statusCode: 400,
+    durationMs: expect.any(Number),
+  });
 });
 
 test('returns 404 for unknown routes', async () => {
-  const { requestHandler } = createAppUnderTest();
+  const { logger, requestHandler } = createAppUnderTest();
   const res = createMockResponse();
 
   await requestHandler(
@@ -82,6 +100,59 @@ test('returns 404 for unknown routes', async () => {
 
   expect(res.statusCode).toBe(404);
   expect(res.bodyText).toBe('Not found');
+  expect(logger.info).toHaveBeenNthCalledWith(1, 'Request started', {
+    method: 'GET',
+    url: '/unknown',
+  });
+  expect(logger.info).toHaveBeenNthCalledWith(2, 'Request completed', {
+    method: 'GET',
+    url: '/unknown',
+    statusCode: 404,
+    durationMs: expect.any(Number),
+  });
+});
+
+test('includes MCP metadata in request logs when available', async () => {
+  const env: AppEnv = {
+    mcpName: 'demo-server',
+    port: 0,
+  };
+
+  const mcpServer = createMcpServer({
+    name: env.mcpName,
+  });
+  const logger = createMockLogger();
+  const transportBridge = {
+    handleRequest: vi.fn(async (_req, _res, _origin, options) => {
+      options?.onMetadata?.({
+        mcpMethod: 'tools/call',
+        mcpToolName: 'echo',
+      });
+    }),
+  };
+
+  const app = createApp({ env, logger, mcpServer, transportBridge });
+  const requestHandler = app.listeners('request')[0] as http.RequestListener;
+  const res = createMockResponse();
+
+  await requestHandler(
+    { headers: {}, method: 'POST', url: '/mcp' } as http.IncomingMessage,
+    res,
+  );
+
+  expect(res.statusCode).toBe(200);
+  expect(logger.info).toHaveBeenNthCalledWith(1, 'Request started', {
+    method: 'POST',
+    url: '/mcp',
+  });
+  expect(logger.info).toHaveBeenNthCalledWith(2, 'Request completed', {
+    method: 'POST',
+    mcpMethod: 'tools/call',
+    mcpToolName: 'echo',
+    url: '/mcp',
+    statusCode: 200,
+    durationMs: expect.any(Number),
+  });
 });
 
 test('returns 500 and logs when request handling fails unexpectedly', async () => {
@@ -93,11 +164,7 @@ test('returns 500 and logs when request handling fails unexpectedly', async () =
   const mcpServer = createMcpServer({
     name: env.mcpName,
   });
-  const logger = {
-    error: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-  };
+  const logger = createMockLogger();
   const transportBridge = {
     handleRequest: vi.fn(async () => {
       throw new Error('transport exploded');
@@ -124,4 +191,9 @@ test('returns 500 and logs when request handling fails unexpectedly', async () =
       url: '/mcp',
     },
   );
+  expect(logger.info).toHaveBeenCalledWith('Request started', {
+    method: 'POST',
+    url: '/mcp',
+  });
+  expect(logger.info).toHaveBeenCalledTimes(1);
 });

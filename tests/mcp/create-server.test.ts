@@ -2,8 +2,14 @@ import { expect, test, vi } from 'vitest';
 
 import { SERVER_VERSION } from '../../src/version.js';
 
-const { McpServerMock, registerEchoTool, registerTimeTool } = vi.hoisted(() => {
+const {
+  McpServerMock,
+  registerEchoTool,
+  registerMockApiPingTool,
+  registerTimeTool,
+} = vi.hoisted(() => {
   const registerEchoTool = vi.fn();
+  const registerMockApiPingTool = vi.fn();
   const registerTimeTool = vi.fn();
 
   class McpServerMock {
@@ -15,7 +21,12 @@ const { McpServerMock, registerEchoTool, registerTimeTool } = vi.hoisted(() => {
     ) {}
   }
 
-  return { McpServerMock, registerEchoTool, registerTimeTool };
+  return {
+    McpServerMock,
+    registerEchoTool,
+    registerMockApiPingTool,
+    registerTimeTool,
+  };
 });
 
 vi.mock('@modelcontextprotocol/server', () => ({
@@ -24,6 +35,10 @@ vi.mock('@modelcontextprotocol/server', () => ({
 
 vi.mock('../../src/mcp/tools/echo.js', () => ({
   registerEchoTool,
+}));
+
+vi.mock('../../src/mcp/tools/mock-api-ping.js', () => ({
+  registerMockApiPingTool,
 }));
 
 vi.mock('../../src/mcp/tools/time.js', () => ({
@@ -48,6 +63,8 @@ test('creates an MCP server and registers the built-in tools', async () => {
   });
   expect(registerEchoTool).toHaveBeenCalledTimes(1);
   expect(registerEchoTool).toHaveBeenCalledWith(server);
+  expect(registerMockApiPingTool).toHaveBeenCalledTimes(1);
+  expect(registerMockApiPingTool).toHaveBeenCalledWith(server);
   expect(registerTimeTool).toHaveBeenCalledTimes(1);
   expect(registerTimeTool).toHaveBeenCalledWith(server);
 });
