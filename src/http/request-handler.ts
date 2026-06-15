@@ -1,7 +1,10 @@
 import type http from 'node:http';
 
 import type { AppEnv } from '../config/env.js';
-import type { McpRequestMetadata, McpTransportBridge } from '../mcp/transport.js';
+import type {
+  McpRequestMetadata,
+  McpTransportBridge,
+} from '../mcp/transport.js';
 import type { Logger } from '../observability/logger.js';
 import { handleHealthRequest } from './routes/health.js';
 

@@ -176,5 +176,7 @@ test('extracts minimal MCP metadata from JSON-RPC request bodies', () => {
     mcpToolName: 'echo',
   });
 
-  expect(extractMcpRequestMetadata(Buffer.from('{"jsonrpc":"2.0"'))).toBeUndefined();
+  expect(
+    extractMcpRequestMetadata(Buffer.from('{"jsonrpc":"2.0"')),
+  ).toBeUndefined();
 });
