@@ -3,5 +3,6 @@ dist/
 coverage/
 .atl/
 .engram/
+.pi/
 .env
 .DS_Store
